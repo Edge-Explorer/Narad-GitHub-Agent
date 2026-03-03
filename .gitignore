@@ -22,6 +22,7 @@ logs/
 data/
 *.db
 *.log
+narad_agent.db
 
 # Distribution / Build
 dist/
