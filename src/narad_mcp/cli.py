@@ -27,9 +27,11 @@ Available commands and their JSON format:
 - exit: {{"cmd": "exit"}}
 
 Rules:
-- If the user refers to "my repos" or "my repositories", use cmd=repos with username=null.
-- If the user says "commits" or "history" without a repo, use cmd=ask.
-- Return ONLY valid JSON. No explanations. No markdown.
+- If the user says "my repos", "list my repos" etc: cmd=repos, username=null.
+- If the user asks for commits but does NOT mention a specific repo (owner/repo format), use cmd=ask with question set to: "I need a specific repository to fetch commits from the GitHub API. Which repo do you want? Example: type  commits Edge-Explorer/Narad-GitHub-Agent"
+- If a specific repo is mentioned in the query, extract it and use cmd=commits.
+- For general coding, GitHub, or open-ended questions: use cmd=ask.
+- Return ONLY valid JSON. No markdown, no explanation.
 
 User message: "{message}"
 """
