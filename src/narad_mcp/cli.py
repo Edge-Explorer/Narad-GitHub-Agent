@@ -3,8 +3,8 @@ import asyncio
 from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Prompt
-from rich.live import Live
-from rich.spinner import Spinner
+from rich.table import Table
+from rich import box
 from narad_mcp.tools.github_tools import GitHubTools
 from narad_mcp.agents.gemini_agent import GeminiAgent
 from narad_mcp.config import settings
@@ -15,47 +15,138 @@ class NaradCLI:
     def __init__(self):
         self.github = GitHubTools()
         self.gemini = GeminiAgent()
-        self.context = ""
 
     def show_welcome(self):
         console.print(Panel.fit(
             f"[bold cyan]Narad GitHub Agent[/bold cyan]\n"
             f"[dim]Version 2.0 | Powered by Gemini 2.0 Flash[/dim]\n\n"
-            f"Type your GitHub questions or commands below.\n"
-            f"Type 'exit' or 'quit' to stop.",
-            title="🚀 Next-Gen CLI",
+            f"[white]Commands you can use:[/white]\n"
+            f"  [green]repos[/green]                     - List your repositories\n"
+            f"  [green]repos <username>[/green]          - List another user's repos\n"
+            f"  [green]commits <owner/repo>[/green]      - Show recent commits\n"
+            f"  [green]branches <owner/repo>[/green]     - Show branches\n"
+            f"  [green]analyze <owner/repo>[/green]      - AI health analysis\n"
+            f"  [green]file <owner/repo> <path>[/green]  - Read a file from a repo\n"
+            f"  [green]ask <question>[/green]            - Ask Gemini anything\n"
+            f"  [green]exit[/green]                      - Quit",
+            title="🚀 Narad CLI",
             border_style="bright_blue"
         ))
 
-    async def handle_query(self, query: str):
-        with console.status("[bold green]Thinking...") as status:
-            # 1. Ask Gemini what tool to use or how to answer
-            # We refine the prompt to give Gemini more context about available tools
-            prompt = f"""
-            The user wants: "{query}"
-            
-            Based on this, should I call a tool or just answer?
-            Available Tools:
-            - list_repositories(username)
-            - get_recent_commits(full_repo_name, limit)
-            - analyze_repository(full_repo_name)
-            - read_file(full_repo_name, file_path, branch)
-            - search_github_code(query)
-            
-            If a tool is needed, respond with: TOOL: name(params)
-            Otherwise, just provide a professional answer.
-            """
-            response = self.gemini.generate_response(prompt)
-            
-            if "TOOL:" in response:
-                # Simple parsing for the demo
-                status.update("[bold yellow]Executing Tool...")
-                # In a full-scale app, we'd use Gemini's tool-calling API.
-                # For this CLI, we'll let Gemini explain what it's doing.
-                final_response = self.gemini.generate_response(f"The user asked: {query}. Tell them you are checking GitHub and provide the result.")
-                console.print(f"\n[bold blue]Narad:[/bold blue] {final_response}")
+    def display_repos(self, repos):
+        if isinstance(repos, str):
+            console.print(f"[red]{repos}[/red]")
+            return
+        table = Table(title="📦 Repositories", box=box.ROUNDED, border_style="blue")
+        table.add_column("Repository", style="cyan", no_wrap=True)
+        for repo in repos:
+            table.add_row(repo)
+        console.print(table)
+
+    def display_commits(self, commits):
+        if isinstance(commits, str):
+            console.print(f"[red]{commits}[/red]")
+            return
+        table = Table(title="📜 Recent Commits", box=box.ROUNDED, border_style="green")
+        table.add_column("SHA", style="yellow", width=8)
+        table.add_column("Author", style="cyan", width=20)
+        table.add_column("Date", style="dim", width=22)
+        table.add_column("Message", style="white")
+        for c in commits:
+            table.add_row(c['sha'], c['author'], c['date'], c['message'].strip()[:80])
+        console.print(table)
+
+    def display_list(self, title, items):
+        if isinstance(items, str):
+            console.print(f"[red]{items}[/red]")
+            return
+        table = Table(title=title, box=box.ROUNDED, border_style="magenta")
+        table.add_column("Name", style="cyan")
+        for item in items:
+            table.add_row(item)
+        console.print(table)
+
+    async def handle_query(self, user_input: str):
+        parts = user_input.strip().split()
+        if not parts:
+            return
+
+        cmd = parts[0].lower()
+
+        # --- repos ---
+        if cmd == "repos":
+            username = parts[1] if len(parts) > 1 else None
+            with console.status("[bold green]Fetching repositories..."):
+                repos = self.github.get_user_repositories(username)
+            self.display_repos(repos)
+
+        # --- commits ---
+        elif cmd == "commits":
+            if len(parts) < 2:
+                console.print("[yellow]Usage: commits <owner/repo>[/yellow]")
+                return
+            repo = parts[1]
+            limit = int(parts[2]) if len(parts) > 2 else 5
+            with console.status(f"[bold green]Fetching commits for {repo}..."):
+                commits = self.github.get_recent_commits(repo, limit)
+            self.display_commits(commits)
+
+        # --- branches ---
+        elif cmd == "branches":
+            if len(parts) < 2:
+                console.print("[yellow]Usage: branches <owner/repo>[/yellow]")
+                return
+            repo = parts[1]
+            with console.status(f"[bold green]Fetching branches for {repo}..."):
+                branches = self.github.list_branches(repo)
+            self.display_list(f"🌿 Branches of {repo}", branches)
+
+        # --- analyze ---
+        elif cmd == "analyze":
+            if len(parts) < 2:
+                console.print("[yellow]Usage: analyze <owner/repo>[/yellow]")
+                return
+            repo = parts[1]
+            with console.status(f"[bold cyan]Running AI analysis on {repo}..."):
+                readme = self.github.get_repo_readme(repo)
+                commits = self.github.get_recent_commits(repo, limit=10)
+                if isinstance(commits, list):
+                    activity = "\n".join([f"- {c['sha']}: {c['message']}" for c in commits])
+                else:
+                    activity = "No commits available"
+                analysis = self.gemini.analyze_repo_health(repo, readme, activity)
+            console.print(Panel(analysis, title=f"🧠 AI Analysis: {repo}", border_style="cyan"))
+
+        # --- file ---
+        elif cmd == "file":
+            if len(parts) < 3:
+                console.print("[yellow]Usage: file <owner/repo> <file_path> [branch][/yellow]")
+                return
+            repo = parts[1]
+            path = parts[2]
+            branch = parts[3] if len(parts) > 3 else "main"
+            with console.status(f"[bold green]Reading {path} from {repo}..."):
+                content = self.github.get_file_content(repo, path, branch)
+            if isinstance(content, str) and "Error" not in content:
+                console.print(Panel(content[:3000], title=f"📄 {path}", border_style="green"))
             else:
-                console.print(f"\n[bold blue]Narad:[/bold blue] {response}")
+                console.print(f"[red]{content}[/red]")
+
+        # --- ask ---
+        elif cmd == "ask":
+            if len(parts) < 2:
+                console.print("[yellow]Usage: ask <your question>[/yellow]")
+                return
+            question = " ".join(parts[1:])
+            with console.status("[bold cyan]Asking Gemini..."):
+                answer = self.gemini.generate_response(question)
+            console.print(Panel(answer, title="🤖 Gemini Says", border_style="cyan"))
+
+        else:
+            console.print(
+                f"[yellow]Unknown command '[bold]{cmd}[/bold]'. "
+                f"Type [bold]help[/bold] or see the welcome panel for available commands.[/yellow]"
+            )
 
     async def run(self):
         self.show_welcome()
@@ -63,11 +154,11 @@ class NaradCLI:
             try:
                 user_input = Prompt.ask("\n[bold green]➜[/bold green]")
                 if user_input.lower() in ['exit', 'quit']:
-                    console.print("[yellow]Goodbye! Keep coding.[/yellow]")
+                    console.print("[yellow]Goodbye! Keep building! 🚀[/yellow]")
                     break
-                
                 await self.handle_query(user_input)
             except KeyboardInterrupt:
+                console.print("\n[yellow]Interrupted. Goodbye![/yellow]")
                 break
             except Exception as e:
                 console.print(f"[red]Error: {e}[/red]")
