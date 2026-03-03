@@ -1,5 +1,6 @@
 import sys
 import asyncio
+import json
 from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Prompt
@@ -11,18 +12,40 @@ from narad_mcp.config import settings
 
 console = Console()
 
+INTENT_PROMPT = """
+You are the command parser for the Narad GitHub Agent CLI. The user typed a natural language message.
+Your job is to convert it into a structured command JSON.
+
+Available commands and their JSON format:
+- repos (own): {{"cmd": "repos", "username": null}}
+- repos (other user): {{"cmd": "repos", "username": "<username>"}}
+- commits: {{"cmd": "commits", "repo": "<owner/repo>", "limit": <number or 5>}}
+- branches: {{"cmd": "branches", "repo": "<owner/repo>"}}
+- analyze: {{"cmd": "analyze", "repo": "<owner/repo>"}}
+- file: {{"cmd": "file", "repo": "<owner/repo>", "path": "<file_path>", "branch": "main"}}
+- ask (general question): {{"cmd": "ask", "question": "<the question>"}}
+- exit: {{"cmd": "exit"}}
+
+Rules:
+- If the user refers to "my repos" or "my repositories", use cmd=repos with username=null.
+- If the user says "commits" or "history" without a repo, use cmd=ask.
+- Return ONLY valid JSON. No explanations. No markdown.
+
+User message: "{message}"
+"""
+
 class NaradCLI:
     def __init__(self):
         self.github = GitHubTools()
         self.gemini = GeminiAgent()
+        self.me = self.github.get_authenticated_username()
 
     def show_welcome(self):
-        me = self.github.get_authenticated_username()
         console.print(Panel.fit(
             f"[bold cyan]Narad GitHub Agent[/bold cyan]"
             f" [dim]v2.0 | Gemini 2.0 Flash[/dim]\n"
-            f"[green]Logged in as:[/green] [bold white]{me}[/bold white]\n\n"
-            f"Commands:\n"
+            f"[green]Logged in as:[/green] [bold white]{self.me}[/bold white]\n\n"
+            f"[dim]You can type natural language or use commands:[/dim]\n"
             f"  [green]repos[/green]                     - [dim]Your repos (auto-detected)[/dim]\n"
             f"  [green]repos <username>[/green]          - [dim]Any user's repos[/dim]\n"
             f"  [green]commits <owner/repo>[/green]      - [dim]Recent commits[/dim]\n"
@@ -45,11 +68,11 @@ class NaradCLI:
             table.add_row(repo)
         console.print(table)
 
-    def display_commits(self, commits):
+    def display_commits(self, commits, repo=""):
         if isinstance(commits, str):
             console.print(f"[red]{commits}[/red]")
             return
-        table = Table(title="📜 Recent Commits", box=box.ROUNDED, border_style="green")
+        table = Table(title=f"📜 Commits: {repo}", box=box.ROUNDED, border_style="green")
         table.add_column("SHA", style="yellow", width=8)
         table.add_column("Author", style="cyan", width=20)
         table.add_column("Date", style="dim", width=22)
@@ -68,88 +91,75 @@ class NaradCLI:
             table.add_row(item)
         console.print(table)
 
-    async def handle_query(self, user_input: str):
-        parts = user_input.strip().split()
-        if not parts:
-            return
+    def parse_intent(self, user_input: str) -> dict:
+        """Use Gemini to convert natural language to a structured command."""
+        prompt = INTENT_PROMPT.format(message=user_input)
+        response = self.gemini.generate_response(prompt, system_instruction="You are a JSON command parser. Return only valid JSON.")
+        # Strip markdown code blocks if Gemini wraps it
+        response = response.strip().strip("```json").strip("```").strip()
+        try:
+            return json.loads(response)
+        except json.JSONDecodeError:
+            # Fallback: treat as an ask question
+            return {"cmd": "ask", "question": user_input}
 
-        cmd = parts[0].lower()
+    async def execute_command(self, parsed: dict):
+        cmd = parsed.get("cmd", "ask")
 
-        # --- repos ---
         if cmd == "repos":
-            username = parts[1] if len(parts) > 1 else None
-            label = username or self.github.get_authenticated_username()
+            username = parsed.get("username")
+            label = username or self.me
             with console.status(f"[bold green]Fetching repositories for [cyan]{label}[/cyan]..."):
                 repos = self.github.get_user_repositories(username)
             self.display_repos(repos)
 
-        # --- commits ---
         elif cmd == "commits":
-            if len(parts) < 2:
-                console.print("[yellow]Usage: commits <owner/repo>[/yellow]")
+            repo = parsed.get("repo")
+            limit = parsed.get("limit", 5)
+            if not repo:
+                console.print("[yellow]Please specify a repo, e.g. 'commits for Edge-Explorer/Narad-GitHub-Agent'[/yellow]")
                 return
-            repo = parts[1]
-            limit = int(parts[2]) if len(parts) > 2 else 5
-            with console.status(f"[bold green]Fetching commits for {repo}..."):
+            with console.status(f"[bold green]Fetching commits for [cyan]{repo}[/cyan]..."):
                 commits = self.github.get_recent_commits(repo, limit)
-            self.display_commits(commits)
+            self.display_commits(commits, repo)
 
-        # --- branches ---
         elif cmd == "branches":
-            if len(parts) < 2:
-                console.print("[yellow]Usage: branches <owner/repo>[/yellow]")
-                return
-            repo = parts[1]
-            with console.status(f"[bold green]Fetching branches for {repo}..."):
+            repo = parsed.get("repo")
+            with console.status(f"[bold green]Fetching branches for [cyan]{repo}[/cyan]..."):
                 branches = self.github.list_branches(repo)
-            self.display_list(f"🌿 Branches of {repo}", branches)
+            self.display_list(f"🌿 Branches: {repo}", branches)
 
-        # --- analyze ---
         elif cmd == "analyze":
-            if len(parts) < 2:
-                console.print("[yellow]Usage: analyze <owner/repo>[/yellow]")
-                return
-            repo = parts[1]
-            with console.status(f"[bold cyan]Running AI analysis on {repo}..."):
+            repo = parsed.get("repo")
+            with console.status(f"[bold cyan]Running AI analysis on [green]{repo}[/green]..."):
                 readme = self.github.get_repo_readme(repo)
                 commits = self.github.get_recent_commits(repo, limit=10)
-                if isinstance(commits, list):
-                    activity = "\n".join([f"- {c['sha']}: {c['message']}" for c in commits])
-                else:
-                    activity = "No commits available"
-                analysis = self.gemini.analyze_repo_health(repo, readme, activity)
-            console.print(Panel(analysis, title=f"🧠 AI Analysis: {repo}", border_style="cyan"))
+                activity = "\n".join([f"- {c['sha']}: {c['message']}" for c in commits]) if isinstance(commits, list) else "N/A"
+                result = self.gemini.analyze_repo_health(repo, readme, activity)
+            console.print(Panel(result, title=f"🧠 AI Analysis: {repo}", border_style="cyan"))
 
-        # --- file ---
         elif cmd == "file":
-            if len(parts) < 3:
-                console.print("[yellow]Usage: file <owner/repo> <file_path> [branch][/yellow]")
-                return
-            repo = parts[1]
-            path = parts[2]
-            branch = parts[3] if len(parts) > 3 else "main"
-            with console.status(f"[bold green]Reading {path} from {repo}..."):
+            repo = parsed.get("repo")
+            path = parsed.get("path")
+            branch = parsed.get("branch", "main")
+            with console.status(f"[bold green]Reading [cyan]{path}[/cyan] from [green]{repo}[/green]..."):
                 content = self.github.get_file_content(repo, path, branch)
             if isinstance(content, str) and "Error" not in content:
                 console.print(Panel(content[:3000], title=f"📄 {path}", border_style="green"))
             else:
                 console.print(f"[red]{content}[/red]")
 
-        # --- ask ---
         elif cmd == "ask":
-            if len(parts) < 2:
-                console.print("[yellow]Usage: ask <your question>[/yellow]")
-                return
-            question = " ".join(parts[1:])
+            question = parsed.get("question", "")
             with console.status("[bold cyan]Asking Gemini..."):
                 answer = self.gemini.generate_response(question)
             console.print(Panel(answer, title="🤖 Gemini Says", border_style="cyan"))
 
+        elif cmd == "exit":
+            raise SystemExit
+
         else:
-            console.print(
-                f"[yellow]Unknown command '[bold]{cmd}[/bold]'. "
-                f"Type [bold]help[/bold] or see the welcome panel for available commands.[/yellow]"
-            )
+            console.print(f"[yellow]I didn't understand that. Try rephrasing![/yellow]")
 
     async def run(self):
         self.show_welcome()
@@ -159,7 +169,15 @@ class NaradCLI:
                 if user_input.lower() in ['exit', 'quit']:
                     console.print("[yellow]Goodbye! Keep building! 🚀[/yellow]")
                     break
-                await self.handle_query(user_input)
+
+                with console.status("[dim]Parsing intent...[/dim]"):
+                    parsed = self.parse_intent(user_input)
+
+                await self.execute_command(parsed)
+
+            except SystemExit:
+                console.print("[yellow]Goodbye! Keep building! 🚀[/yellow]")
+                break
             except KeyboardInterrupt:
                 console.print("\n[yellow]Interrupted. Goodbye![/yellow]")
                 break
