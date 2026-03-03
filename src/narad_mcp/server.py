@@ -12,7 +12,7 @@ logging.basicConfig(
     handlers=[logging.StreamHandler()]
 )
 logger = logging.getLogger("narad_mcp_server")
-print(f"🚀 Initializing {settings.app_name}...")
+print(f"Initializing {settings.app_name}...")
 
 # Create an industry-grade MCP server
 mcp = FastMCP(settings.app_name)
