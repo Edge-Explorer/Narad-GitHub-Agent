@@ -4,3 +4,5 @@ python-dotenv
 httpx
 PyGitHub
 pydantic
+pydantic-settings
+rich
