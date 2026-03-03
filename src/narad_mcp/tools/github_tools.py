@@ -188,7 +188,8 @@ class GitHubTools:
         Returns commit activity and open PRs for your top repos.
         """
         try:
-            repos = list(self._me.get_repos(affiliation='owner')[:10])
+            # Sort by 'pushed' to get truly active repositories at the top
+            repos = list(self._me.get_repos(affiliation='owner', sort='pushed')[:10])
             digest_data = []
             for repo in repos:
                 commits = list(repo.get_commits()[:3])
@@ -198,7 +199,11 @@ class GitHubTools:
                     "stars": repo.stargazers_count,
                     "open_prs": len(prs),
                     "recent_commits": [
-                        {"sha": c.sha[:7], "msg": c.commit.message.split('\n')[0]}
+                        {
+                            "sha": c.sha[:7], 
+                            "msg": c.commit.message.split('\n')[0],
+                            "date": c.commit.author.date.isoformat()
+                        }
                         for c in commits
                     ]
                 })

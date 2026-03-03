@@ -1,5 +1,6 @@
 from google import genai
 from google.genai import types
+from datetime import datetime
 from narad_mcp.config import settings
 
 class GeminiAgent:
@@ -103,24 +104,28 @@ Provide a professional code review covering:
 
         repo_blocks = []
         for r in digest_data.get("repos", []):
-            commits_str = "\n".join([f"  - [{c['sha']}] {c['msg']}" for c in r['recent_commits']]) or "  No recent commits"
+            commits_str = "\n".join([
+                f"  - [{c['sha']}] {c['msg']} ({c['date'][:10]})" 
+                for c in r['recent_commits']
+            ]) or "  No recent commits"
             repo_blocks.append(
                 f"**{r['repo']}** ⭐{r['stars']} | 🔀 {r['open_prs']} open PRs\n{commits_str}"
             )
 
         prompt = f"""
 Generate a concise and engaging **Daily GitHub Digest** for the developer @{digest_data['username']}.
+TODAY'S DATE: {datetime.now().strftime('%Y-%m-%d %A')}
 
-Here is their recent activity across their top repositories:
-
+Here is their recent activity across their repositories:
 {chr(10).join(repo_blocks)}
 
-Format:
-- Start with a motivational one-liner
-- Summarize overall activity in 2 sentences
-- Highlight the most active repo
-- List any repos with open PRs needing attention
-- End with a tip or suggestion for today
+Instructions:
+- Focus on activity from the **last 7 days**. If everything is older, summarize what was last touched.
+- Start with a motivational one-liner.
+- Summarize overall status in 2 sentences.
+- Highlight the single most active repo this week.
+- List any repos with open PRs needing attention.
+- End with a task/tip for today based on the activity level (e.g., 'Quiet week, time to clean up tech debt!' or 'Heave push today, keep it up!').
 """
         return self.generate_response(prompt, system_instruction="You are a helpful daily standup assistant for developers. Be energetic, concise, and insightful.")
 
