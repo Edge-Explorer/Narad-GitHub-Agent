@@ -71,6 +71,24 @@ async def ask_gemini_github(question: str):
     logger.info(f"Answering general question: {question}")
     return gemini.generate_response(question)
 
+@mcp.tool()
+async def review_pull_request(full_repo_name: str, pr_number: int):
+    """Expert AI code review of a GitHub pull request's diff."""
+    logger.info(f"AI reviewing PR #{pr_number} from {full_repo_name}")
+    pr_data = github_tools.get_pull_request_diff(full_repo_name, pr_number)
+    if "error" in pr_data:
+        return f"Error: {pr_data['error']}"
+    return gemini.review_pull_request(pr_data)
+
+@mcp.tool()
+async def analyze_user_profile(username: str = None):
+    """Get a professional AI-powered summary of a GitHub user's expertise and tech stack."""
+    logger.info(f"Analyzing user profile: {username or 'me'}")
+    profile_data = github_tools.get_user_profile(username)
+    if isinstance(profile_data, str):
+        return f"Error: {profile_data}"
+    return gemini.generate_user_summary(profile_data)
+
 if __name__ == "__main__":
     logger.info(f"Starting {settings.app_name}...")
     mcp.run()
