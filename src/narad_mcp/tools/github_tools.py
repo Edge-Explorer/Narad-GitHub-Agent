@@ -111,6 +111,38 @@ class GitHubTools:
         except Exception as e:
             return f"Error searching code: {str(e)}"
 
+    def get_user_profile(self, username: str = None) -> dict:
+        """
+        Get a comprehensive profile overview of a GitHub user.
+        Returns bio, stats, and top repos sorted by stars.
+        """
+        try:
+            user = self.gh.get_user(username) if username else self._me
+            repos = sorted(user.get_repos(), key=lambda r: r.stargazers_count, reverse=True)[:10]
+            return {
+                "login": user.login,
+                "name": user.name,
+                "bio": user.bio,
+                "location": user.location,
+                "public_repos": user.public_repos,
+                "followers": user.followers,
+                "following": user.following,
+                "html_url": user.html_url,
+                "top_repos": [
+                    {
+                        "name": r.full_name,
+                        "stars": r.stargazers_count,
+                        "language": r.language,
+                        "description": r.description,
+                    }
+                    for r in repos
+                ]
+            }
+        except GithubException as e:
+            return f"GitHub Error: {e.data.get('message', str(e))}"
+        except Exception as e:
+            return f"Error fetching profile: {str(e)}"
+
     def get_pull_request_diff(self, full_repo_name: str, pr_number: int) -> dict:
         """Fetch a PR's metadata and its full diff for AI review."""
         try:

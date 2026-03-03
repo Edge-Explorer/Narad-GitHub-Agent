@@ -2,6 +2,7 @@ import sys
 import asyncio
 import json
 import uuid
+import re
 from datetime import datetime
 from rich.console import Console
 from rich.panel import Panel
@@ -14,6 +15,14 @@ from narad_mcp.config import settings
 from narad_mcp import database as db
 
 console = Console()
+
+def clean_md(text: str) -> str:
+    """Remove markdown bold/italic/header symbols so Rich panels render cleanly."""
+    text = re.sub(r'\*\*(.*?)\*\*', r'\1', text)   # **bold**
+    text = re.sub(r'\*(.*?)\*', r'\1', text)         # *italic*
+    text = re.sub(r'#{1,6}\s*', '', text)            # ## Headers
+    text = re.sub(r'`{1,3}(.*?)`{1,3}', r'\1', text, flags=re.DOTALL)  # `code`
+    return text.strip()
 
 INTENT_PROMPT = """
 You are the command parser for the Narad GitHub Agent CLI. The user typed a natural language message.
@@ -28,6 +37,7 @@ Available commands and their JSON format:
 - file: {{"cmd": "file", "repo": "<owner/repo>", "path": "<file_path>", "branch": "main"}}
 - prs: {{"cmd": "prs", "repo": "<owner/repo>"}}
 - review_pr: {{"cmd": "review_pr", "repo": "<owner/repo>", "pr_number": <number>}}
+- profile: {{"cmd": "profile", "username": "<username or null for self>"}}
 - digest: {{"cmd": "digest"}}
 - history: {{"cmd": "history"}}
 - ask (general question): {{"cmd": "ask", "question": "<the question>"}}
@@ -41,6 +51,7 @@ Rules:
 - "review PR", "code review" -> cmd=review_pr with repo and pr_number.
 - "open PRs", "list PRs" -> cmd=prs.
 - "history", "past questions", "what did I ask" -> cmd=history.
+- "profile", "overview", "user info", "about user" -> cmd=profile.
 - For general coding, GitHub, or open-ended questions: use cmd=ask.
 - Return ONLY valid JSON. No markdown, no explanation.
 
@@ -60,19 +71,22 @@ class NaradCLI:
             f"[bold cyan]Narad GitHub Agent[/bold cyan]"
             f" [dim]v2.0 | Gemini 2.0 Flash[/dim]\n"
             f"[green]Logged in as:[/green] [bold white]{self.me}[/bold white]"
-            f" [dim]| Session: {self.session_id[:8]}[/dim]\n\n"
-            f"[dim]You can type natural language or use these keywords:[/dim]\n"
+            f" [dim]| Session: {self.session_id[:8]}[/dim]\n"
+            f"[dim]Token:[/dim] [dim]Loaded from your .env (GITHUB_TOKEN) — 100% dynamic, not hardcoded[/dim]\n\n"
+            f"[dim]Natural language or keywords:[/dim]\n"
             f"  [green]repos[/green]                       - [dim]Your repos[/dim]\n"
+            f"  [green]profile[/green]                     - [dim]Your GitHub profile overview[/dim]\n"
+            f"  [green]profile <username>[/green]          - [dim]Any user's profile & repos[/dim]\n"
             f"  [green]commits <owner/repo>[/green]        - [dim]Recent commits[/dim]\n"
             f"  [green]branches <owner/repo>[/green]       - [dim]Branches[/dim]\n"
             f"  [green]prs <owner/repo>[/green]            - [dim]Open pull requests[/dim]\n"
-            f"  [green]review pr <owner/repo> <#>[/green]  - [dim]🔥 AI Code Review a PR[/dim]\n"
+            f"  [green]review pr <owner/repo> <#>[/green]  - [dim]AI Code Review a PR[/dim]\n"
             f"  [green]analyze <owner/repo>[/green]        - [dim]AI health report[/dim]\n"
-            f"  [green]digest[/green]                      - [dim]🌅 Daily GitHub Digest[/dim]\n"
-            f"  [green]history[/green]                     - [dim]💬 View past questions[/dim]\n"
+            f"  [green]digest[/green]                      - [dim]Daily GitHub Digest[/dim]\n"
+            f"  [green]history[/green]                     - [dim]View past questions[/dim]\n"
             f"  [green]ask <question>[/green]              - [dim]Ask Gemini anything[/dim]\n"
             f"  [green]exit[/green]                        - [dim]Quit[/dim]",
-            title="🚀 Narad CLI",
+            title="Narad CLI",
             border_style="bright_blue"
         ))
 
@@ -203,15 +217,16 @@ class NaradCLI:
                 else:
                     console.print(f"[dim]ℹ️ No open pull requests found in [cyan]{repo}[/cyan]. Create one on GitHub first![/dim]")
                 return
-            with console.status("[bold cyan]🤖 Gemini is reviewing the code..."):
+            with console.status("[bold cyan]Gemini is reviewing the code..."):
                 review = self.gemini.review_pull_request(pr_data)
                 db.save_pr_review(repo, pr_data['number'], pr_data['title'], review)
             console.print(Panel(
-                review,
-                title=f"🔥 AI Code Review: PR #{pr_data['number']} — {pr_data['title']}",
+                clean_md(review),
+                title=f"AI Code Review: PR #{pr_data['number']} - {pr_data['title']}",
                 border_style="red"
             ))
             db.save_message(self.session_id, "assistant", f"Reviewed PR #{pr_number} in {repo}")
+
 
 
         elif cmd == "analyze":
@@ -221,16 +236,48 @@ class NaradCLI:
                 commits = self.github.get_recent_commits(repo, limit=10)
                 activity = "\n".join([f"- {c['sha']}: {c['message']}" for c in commits]) if isinstance(commits, list) else "N/A"
                 result = self.gemini.analyze_repo_health(repo, readme, activity)
-            console.print(Panel(result, title=f"🧠 AI Analysis: {repo}", border_style="cyan"))
+            console.print(Panel(clean_md(result), title=f"AI Analysis: {repo}", border_style="cyan"))
             db.save_message(self.session_id, "assistant", f"Analyzed repo: {repo}")
 
+        elif cmd == "profile":
+            username = parsed.get("username") or None
+            label = username or self.me
+            with console.status(f"[bold green]Fetching profile for [cyan]{label}[/cyan]..."):
+                profile = self.github.get_user_profile(username)
+            if isinstance(profile, str):
+                console.print(f"[red]{profile}[/red]")
+                return
+            # Build a rich profile table
+            table = Table(title=f"GitHub Profile: {profile['login']}", box=box.ROUNDED, border_style="bright_blue")
+            table.add_column("Field", style="cyan", width=20)
+            table.add_column("Value", style="white")
+            table.add_row("Username", profile['login'])
+            table.add_row("Name", profile.get('name') or '-')
+            table.add_row("Bio", profile.get('bio') or '-')
+            table.add_row("Location", profile.get('location') or '-')
+            table.add_row("Public Repos", str(profile['public_repos']))
+            table.add_row("Followers", str(profile['followers']))
+            table.add_row("Following", str(profile['following']))
+            table.add_row("GitHub URL", profile['html_url'])
+            console.print(table)
+            # Also show their top repos
+            if profile.get('top_repos'):
+                repo_table = Table(title=f"Top Repos of {profile['login']}", box=box.ROUNDED, border_style="blue")
+                repo_table.add_column("Repo", style="cyan")
+                repo_table.add_column("Stars", style="yellow", width=8)
+                repo_table.add_column("Language", style="green", width=15)
+                repo_table.add_column("Description", style="dim")
+                for r in profile['top_repos']:
+                    repo_table.add_row(r['name'], str(r['stars']), r['language'] or '-', (r['description'] or '-')[:60])
+                console.print(repo_table)
+
         elif cmd == "digest":
-            with console.status("[bold yellow]🌅 Gathering your GitHub activity..."):
+            with console.status("[bold yellow]Gathering your GitHub activity..."):
                 data = self.github.get_daily_digest_data()
-            with console.status("[bold cyan]✍️ Gemini is writing your Daily Digest..."):
+            with console.status("[bold cyan]Gemini is writing your Daily Digest..."):
                 digest = self.gemini.generate_daily_digest(data)
                 db.save_digest(digest)
-            console.print(Panel(digest, title=f"🌅 Daily GitHub Digest — {datetime.now().strftime('%A, %d %b %Y')}", border_style="yellow"))
+            console.print(Panel(clean_md(digest), title=f"Daily GitHub Digest — {datetime.now().strftime('%A, %d %b %Y')}", border_style="yellow"))
             db.save_message(self.session_id, "assistant", "Generated daily digest")
 
         elif cmd == "history":
@@ -245,7 +292,7 @@ class NaradCLI:
                     answer = self.gemini.generate_with_memory(question, history)
                 else:
                     answer = self.gemini.generate_response(question)
-            console.print(Panel(answer, title="🤖 Gemini Says", border_style="cyan"))
+            console.print(Panel(clean_md(answer), title="Gemini Says", border_style="cyan"))
             db.save_message(self.session_id, "assistant", answer[:500])
 
         elif cmd == "exit":
