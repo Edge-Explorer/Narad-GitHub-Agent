@@ -193,7 +193,16 @@ class NaradCLI:
             with console.status(f"[bold red]🔍 Fetching PR #{pr_number} from [cyan]{repo}[/cyan]..."):
                 pr_data = self.github.get_pull_request_diff(repo, int(pr_number))
             if "error" in pr_data:
-                console.print(f"[red]{pr_data['error']}[/red]"); return
+                console.print(f"[red]❌ {pr_data['error']}[/red]")
+                # Show available PRs to help the user pick the right number
+                with console.status("[dim]Fetching available PRs..."):
+                    prs = self.github.list_open_prs(repo)
+                if isinstance(prs, list) and prs:
+                    console.print(f"\n[yellow]Available open PRs in [cyan]{repo}[/cyan]:[/yellow]")
+                    self.display_prs(prs, repo)
+                else:
+                    console.print(f"[dim]ℹ️ No open pull requests found in [cyan]{repo}[/cyan]. Create one on GitHub first![/dim]")
+                return
             with console.status("[bold cyan]🤖 Gemini is reviewing the code..."):
                 review = self.gemini.review_pull_request(pr_data)
                 db.save_pr_review(repo, pr_data['number'], pr_data['title'], review)
@@ -203,6 +212,7 @@ class NaradCLI:
                 border_style="red"
             ))
             db.save_message(self.session_id, "assistant", f"Reviewed PR #{pr_number} in {repo}")
+
 
         elif cmd == "analyze":
             repo = parsed.get("repo")
