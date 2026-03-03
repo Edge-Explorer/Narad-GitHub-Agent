@@ -1,14 +1,16 @@
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from narad_mcp.config import settings
 
 class GeminiAgent:
     def __init__(self, api_key=None):
-        self.api_key = api_key or settings.gemini_api_key.get_secret_value()
-        if not self.api_key:
+        api_key = api_key or settings.gemini_api_key.get_secret_value()
+        if not api_key:
             raise ValueError("GEMINI_API_KEY not found in configuration")
         
-        genai.configure(api_key=self.api_key)
-        self.model_name = settings.gemini_model
+        # New Google GenAI SDK Client
+        self.client = genai.Client(api_key=api_key)
+        self.model_name = settings.gemini_model  # should be gemini-2.0-flash or gemini-2.0-flash-exp
         
         self.base_system_instruction = """
         You are the Narad GitHub Agent, a premium AI assistant powered by Gemini 2.0 Flash and the Model Context Protocol (MCP).
@@ -23,18 +25,21 @@ class GeminiAgent:
 
     def generate_response(self, prompt: str, system_instruction: str = None) -> str:
         """
-        Generate a high-quality response for a given prompt using Gemini 2.0 Flash.
+        Generate a high-quality response for a given prompt using Gemini 2.0 Flash (New SDK).
         """
         instruction = system_instruction or self.base_system_instruction
         
-        # Re-initialize model with specific system instruction if provided
-        agent_model = genai.GenerativeModel(
-            model_name=self.model_name,
-            system_instruction=instruction
-        )
-        
-        response = agent_model.generate_content(prompt)
-        return response.text
+        try:
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                config=types.GenerateContentConfig(
+                    system_instruction=instruction,
+                ),
+                contents=prompt
+            )
+            return response.text
+        except Exception as e:
+            return f"Gemini API Error: {str(e)}"
 
     def analyze_repo_health(self, repo_name: str, readme_content: str, commit_history: str) -> str:
         """

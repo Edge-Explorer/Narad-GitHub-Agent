@@ -1,5 +1,5 @@
 mcp
-google-generativeai
+google-genai
 python-dotenv
 httpx
 PyGitHub
