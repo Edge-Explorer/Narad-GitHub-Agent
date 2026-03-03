@@ -270,6 +270,12 @@ class NaradCLI:
                 for r in profile['top_repos']:
                     repo_table.add_row(r['name'], str(r['stars']), r['language'] or '-', (r['description'] or '-')[:60])
                 console.print(repo_table)
+            
+            # Add AI Summary
+            with console.status(f"[bold cyan]🤖 Gemini is generating a professional summary for {label}..."):
+                summary = self.gemini.generate_user_summary(profile)
+            console.print(Panel(clean_md(summary), title=f"🧠 AI Developer Summary: {label}", border_style="bright_blue"))
+            db.save_message(self.session_id, "assistant", f"Generated summary for profile: {label}")
 
         elif cmd == "digest":
             with console.status("[bold yellow]Gathering your GitHub activity..."):

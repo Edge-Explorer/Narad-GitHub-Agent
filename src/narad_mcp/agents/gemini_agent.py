@@ -123,3 +123,33 @@ Format:
 - End with a tip or suggestion for today
 """
         return self.generate_response(prompt, system_instruction="You are a helpful daily standup assistant for developers. Be energetic, concise, and insightful.")
+
+    def generate_user_summary(self, profile_data: dict) -> str:
+        """
+        Generate an AI-powered professional summary of a GitHub user based on their profile and top repos.
+        """
+        repos_str = "\n".join([
+            f"- {r['name']} ({r['stars']} stars): {r['description'] or 'No description'}"
+            for r in profile_data.get('top_repos', [])
+        ])
+        
+        prompt = f"""
+        Analyze the following GitHub profile and provide a professional summary of the developer's focus, 
+        tech stack, and expertise:
+
+        USER: {profile_data['login']}
+        NAME: {profile_data.get('name', 'N/A')}
+        BIO: {profile_data.get('bio', 'N/A')}
+        LOCATION: {profile_data.get('location', 'N/A')}
+        STATS: {profile_data['public_repos']} repos, {profile_data['followers']} followers
+
+        TOP REPOSITORIES:
+        {repos_str}
+
+        Format:
+        1. **Expertise Overview**: 2-3 sentences.
+        2. **Core Tech Stack**: Based on their repos.
+        3. **Notable Projects**: Highlight 1-2 key repos.
+        4. **Verdict**: A friendly "developer persona" (e.g., 'The Backend Architect' or 'The Python Enthusiast').
+        """
+        return self.generate_response(prompt, system_instruction="You are a talent scout and technical analyst. Be professional, observant, and encouraging.")

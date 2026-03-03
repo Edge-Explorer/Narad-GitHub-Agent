@@ -19,7 +19,7 @@ Powered by **Gemini 2.0 Flash**, it transforms complex repository tasks into sim
 | **🧠 Conversation Memory** | Every session is stored in a local SQLite DB — Gemini remembers context |
 | **🔥 PR Code Reviewer** | Fetch a PR's diff and get an expert AI code review (bugs, security, rating) |
 | **🌅 Daily Digest** | AI-written morning report of activity across all your repos |
-| **👤 Profile Overview** | View any GitHub user's bio, stats, and top repos sorted by stars |
+| **👤 Profile Overview** | View any GitHub user's bio, stats, and top repos with an **AI Developer Summary** |
 | **⚡ Gemini 2.0 Flash** | Reasoning engine for repo health, code analysis, and GitHub Q&A |
 | **🔐 Security First** | `.env` is git-ignored. Your token is never pushed to GitHub |
 | **📦 Clean Architecture** | Pydantic Settings, structured logging, modular tool design |
