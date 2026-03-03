@@ -1,0 +1,29 @@
+# Virtual Environment
+venv/
+.venv/
+env/
+bin/
+lib/
+include/
+*.pyc
+__pycache__/
+
+# Environment Variables
+.env
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Project Specific
+logs/
+data/
+*.db
+*.log
+
+# Distribution / Build
+dist/
+build/
+*.egg-info/

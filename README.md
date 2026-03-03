@@ -1,45 +1,91 @@
-# Narad GitHub Agent 🧠💻
+# Narad GitHub Agent 🚀🤖
 
-The **Narad GitHub Agent** is a modular backend component designed to interface with GitHub repositories. It allows users to query repository contents, manage issues, pull requests, and more, using natural language commands. This agent is part of the Narad AI assistant ecosystem, providing seamless integration with GitHub functionalities.
+### A Premium CLI MCP Server Powered by Gemini 2.0 Flash
 
----
-
-## ⚙️ Features
-
-* **Repository Interaction**: Retrieve information about repositories, including README files, contributors, and commit histories.
-* **Issue Management**: Create, update, and query issues within repositories.
-* **Pull Request Handling**: Manage pull requests, including creation and status checks.
-* **Natural Language Processing**: Interpret and respond to user queries in natural language, converting them into appropriate GitHub API calls.
-* **Modular Design**: Easily extendable to support additional GitHub features or integrate with other services.([GitHub][1])
+The **Narad GitHub Agent** is a next-generation, modular Model Context Protocol (MCP) server engineered to provide seamless high-level interactions with GitHub. Leveraging the lightning-fast reasoning of **Gemini 2.0 Flash**, it transforms complex repository tasks into simple, agentic tool calls.
 
 ---
 
-## 🧠 Tech Stack
+## ✨ Key Features
 
-* **Backend**: Python (Flask)
-* **Natural Language Processing**: OpenAI GPT models
-* **GitHub Integration**: GitHub REST API
-* **Authentication**: OAuth 2.0
-
----
-
-## 📁 Modules
-
-* `github_agent.py`: Core agent handling GitHub interactions.
-* `nlp_processor.py`: Processes and interprets natural language queries.
-* `auth.py`: Handles authentication and authorization with GitHub.
-* `config.py`: Configuration settings for the agent.([GitHub][2])
+- **🌐 MCP Native**: Built on the Model Context Protocol for universal AI tool integration.
+- **⚡ Gemini 2.0 Flash**: State-of-the-art reasoning for summarizing codebases and interpreting repository data.
+- **🛠️ GitHub Toolbelt**: 
+  - Effortless repository listing and discovery.
+  - Deep commit history analysis.
+  - Automated issue creation and management.
+  - AI-powered README interpretation and repository explanation.
+- **🔐 Security First**: Zero-trust approach to credentials with strict `.gitignore` and `.env` isolation.
 
 ---
 
-## 🧪 Input
+## 🛠️ Tech Stack
 
-* **User Queries**: Natural language inputs from users, such as "Show me the latest commit in the repository" or "Create a new issue titled 'Bug in login page'".
-* **GitHub Events**: Webhooks or API responses from GitHub, such as push events or issue updates.
+- **Reasoning**: Gemini 2.0 Flash (Experimental)
+- **Framework**: Model Context Protocol (FastMCP)
+- **Language**: Python 3.10+
+- **APIs**: GitHub REST API (via PyGitHub)
+- **Environment**: Virtual Environment (Venv)
 
 ---
 
-## 🚀 Goal
+## 📁 Project Structure
 
-To provide an intelligent and conversational interface for interacting with GitHub repositories, enabling users to manage their projects more efficiently through natural language commands.
+```text
+Narad-GitHub-Agent/
+├── src/
+│   └── narad_mcp/
+│       ├── tools/       # GitHub API tool logic
+│       ├── agents/      # Gemini reasoning engine
+│       └── server.py    # Main MCP server entry point
+├── tests/               # Quality assurance suite
+├── .env                 # Secrets (Ignored)
+└── requirements.txt     # Modern dependencies
+```
 
+---
+
+## 🚀 Quick Start
+
+### 1. Prerequisites
+Ensure you have Python 3.10+ installed and your API keys ready (GitHub & Gemini).
+
+### 2. Setup Environment
+```powershell
+# Create virtual environment
+python -m venv venv
+
+# Activate (Windows)
+.\venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+```
+
+### 3. Configuration
+Create a `.env` file based on the `.env.example`:
+```env
+GITHUB_TOKEN="your_personal_access_token"
+GEMINI_API_KEY="your_gemini_api_key_here"
+```
+
+### 4. Launch the Server
+```powershell
+python src/narad_mcp/server.py
+```
+
+---
+
+## 🔒 Security & Best Practices
+
+- **Avoid Credential Leaks**: Never push your `.env` to GitHub. The project includes a pre-configured `.gitignore`.
+- **Modular Design**: Tools are decoupled from the server logic, making it easy to extend for GitLab or Bitbucket.
+- **Audit Logs**: (Coming Soon) Detailed logging for all agentic actions.
+
+---
+
+## 🤝 Contribution
+Re-engineered with ❤️ by Antigravity. Let's build the future of agentic coding together!
+
+---
+*Narad AI Ecosystem 2026*
