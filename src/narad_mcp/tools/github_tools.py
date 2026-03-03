@@ -12,16 +12,22 @@ class GitHubTools:
         if not self.token:
             raise ValueError("GITHUB_TOKEN not found in configuration")
         self.gh = Github(self.token)
+        # Cache authenticated user from token — no need to pass username manually
+        self._me = self.gh.get_user()
+
+    def get_authenticated_username(self):
+        """Return the GitHub login of the authenticated user."""
+        return self._me.login
 
     def get_user_repositories(self, username=None):
-        """List repositories for a user. If username is None, lists repos for the authenticated user."""
+        """List repositories. If no username given, uses the authenticated token owner."""
         try:
             if username:
                 user = self.gh.get_user(username)
                 repos = user.get_repos()
             else:
-                user = self.gh.get_user()
-                repos = user.get_repos()
+                # Use authenticated user — gets ALL repos including private
+                repos = self._me.get_repos(affiliation='owner,collaborator,organization_member')
             
             return [repo.full_name for repo in repos]
         except GithubException as e:

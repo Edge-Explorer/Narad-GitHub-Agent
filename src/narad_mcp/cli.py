@@ -17,18 +17,20 @@ class NaradCLI:
         self.gemini = GeminiAgent()
 
     def show_welcome(self):
+        me = self.github.get_authenticated_username()
         console.print(Panel.fit(
-            f"[bold cyan]Narad GitHub Agent[/bold cyan]\n"
-            f"[dim]Version 2.0 | Powered by Gemini 2.0 Flash[/dim]\n\n"
-            f"[white]Commands you can use:[/white]\n"
-            f"  [green]repos[/green]                     - List your repositories\n"
-            f"  [green]repos <username>[/green]          - List another user's repos\n"
-            f"  [green]commits <owner/repo>[/green]      - Show recent commits\n"
-            f"  [green]branches <owner/repo>[/green]     - Show branches\n"
-            f"  [green]analyze <owner/repo>[/green]      - AI health analysis\n"
-            f"  [green]file <owner/repo> <path>[/green]  - Read a file from a repo\n"
-            f"  [green]ask <question>[/green]            - Ask Gemini anything\n"
-            f"  [green]exit[/green]                      - Quit",
+            f"[bold cyan]Narad GitHub Agent[/bold cyan]"
+            f" [dim]v2.0 | Gemini 2.0 Flash[/dim]\n"
+            f"[green]Logged in as:[/green] [bold white]{me}[/bold white]\n\n"
+            f"Commands:\n"
+            f"  [green]repos[/green]                     - [dim]Your repos (auto-detected)[/dim]\n"
+            f"  [green]repos <username>[/green]          - [dim]Any user's repos[/dim]\n"
+            f"  [green]commits <owner/repo>[/green]      - [dim]Recent commits[/dim]\n"
+            f"  [green]branches <owner/repo>[/green]     - [dim]List branches[/dim]\n"
+            f"  [green]analyze <owner/repo>[/green]      - [dim]AI health report[/dim]\n"
+            f"  [green]file <owner/repo> <path>[/green]  - [dim]Read a file[/dim]\n"
+            f"  [green]ask <question>[/green]            - [dim]Ask Gemini anything[/dim]\n"
+            f"  [green]exit[/green]                      - [dim]Quit[/dim]",
             title="🚀 Narad CLI",
             border_style="bright_blue"
         ))
@@ -76,7 +78,8 @@ class NaradCLI:
         # --- repos ---
         if cmd == "repos":
             username = parts[1] if len(parts) > 1 else None
-            with console.status("[bold green]Fetching repositories..."):
+            label = username or self.github.get_authenticated_username()
+            with console.status(f"[bold green]Fetching repositories for [cyan]{label}[/cyan]..."):
                 repos = self.github.get_user_repositories(username)
             self.display_repos(repos)
 
