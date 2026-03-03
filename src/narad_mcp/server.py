@@ -6,8 +6,13 @@ from narad_mcp.agents.gemini_agent import GeminiAgent
 from narad_mcp.config import settings
 
 # Initialize logging for the server
-logging.basicConfig(level=settings.log_level)
+logging.basicConfig(
+    level=settings.log_level,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[logging.StreamHandler()]
+)
 logger = logging.getLogger("narad_mcp_server")
+print(f"🚀 Initializing {settings.app_name}...")
 
 # Create an industry-grade MCP server
 mcp = FastMCP(settings.app_name)
