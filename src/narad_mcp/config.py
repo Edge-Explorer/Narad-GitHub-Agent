@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     # App Settings
     app_name: str = "Narad-GitHub-Agent"
     log_level: str = "INFO"
-    gemini_model: str = "gemini-2.0-flash-exp"
+    gemini_model: str = "gemini-2.0-flash"
 
     # GitHub Settings
     github_base_url: str = "https://api.github.com"
