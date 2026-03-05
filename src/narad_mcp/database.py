@@ -3,7 +3,7 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-DB_PATH = Path("narad_agent.db")
+DB_PATH = Path(__file__).parent.parent.parent / "narad_agent.db"
 
 def get_connection():
     conn = sqlite3.connect(DB_PATH)

@@ -4,7 +4,6 @@ from narad_mcp.server import mcp
 
 def run_server():
     """Runs the MCP Server (Stdio mode)"""
-    print("Initializing Narad-GitHub-Agent MCP Server...")
     mcp.run()
 
 async def run_cli():
