@@ -194,4 +194,10 @@ When running as an MCP Server, these tools are exposed to your AI IDE:
 Built as part of the **Narad AI Ecosystem** — a family of modular, premium AI agents.
 
 ---
+
+## 📜 License
+
+This project is licensed under the **MIT License**. See the [LICENSE](LICENSE) file for details.
+
+---
 *© 2026 Edge-Explorer · Narad AI Ecosystem*
